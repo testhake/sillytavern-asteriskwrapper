@@ -8,73 +8,87 @@ function wrapWithAsterisks(text) {
         return text;
     }
 
-    let result = '';
-    let i = 0;
-    let buffer = '';
+    // Step 1: Parse the text into tokens (quoted text and non-quoted text)
+    const tokens = [];
+    let currentPos = 0;
+    const quoteRegex = /"[^"]*"/g;
+    let match;
 
-    while (i < text.length) {
-        const char = text[i];
-
-        // Check for quoted text
-        if (char === '"') {
-            // Flush buffer with asterisks if it has content
-            if (buffer.trim()) {
-                result += '*' + buffer + '*';
-                buffer = '';
-            }
-
-            // Find closing quote
-            let quoteContent = '"';
-            i++;
-            while (i < text.length && text[i] !== '"') {
-                quoteContent += text[i];
-                i++;
-            }
-            if (i < text.length) {
-                quoteContent += '"';
-                i++;
-            }
-            result += quoteContent;
-            continue;
-        }
-
-        // Check for asterisk-wrapped text
-        if (char === '*') {
-            // Flush buffer with asterisks if it has content
-            if (buffer.trim()) {
-                result += '*' + buffer + '*';
-                buffer = '';
-            }
-
-            // Find closing asterisk
-            let asteriskContent = '*';
-            i++;
-            while (i < text.length && text[i] !== '*') {
-                asteriskContent += text[i];
-                i++;
-            }
-            if (i < text.length) {
-                asteriskContent += '*';
-                i++;
-            }
-            result += asteriskContent;
-            continue;
-        }
-
-        // Regular character - add to buffer
-        buffer += char;
-        i++;
+    // Extract all quoted sections
+    const quotes = [];
+    while ((match = quoteRegex.exec(text)) !== null) {
+        quotes.push({
+            start: match.index,
+            end: match.index + match[0].length,
+            text: match[0]
+        });
     }
 
-    // Flush remaining buffer
-    if (buffer.trim()) {
-        result += '*' + buffer + '*';
-    } else if (buffer) {
-        // Preserve trailing whitespace
-        result += buffer;
+    // Build tokens array with quoted and unquoted sections
+    quotes.forEach(quote => {
+        // Add text before quote
+        if (currentPos < quote.start) {
+            tokens.push({
+                type: 'unquoted',
+                text: text.substring(currentPos, quote.start)
+            });
+        }
+        // Add quoted text
+        tokens.push({
+            type: 'quoted',
+            text: quote.text
+        });
+        currentPos = quote.end;
+    });
+
+    // Add remaining text after last quote
+    if (currentPos < text.length) {
+        tokens.push({
+            type: 'unquoted',
+            text: text.substring(currentPos)
+        });
     }
 
-    return result;
+    // If no quotes found, entire text is unquoted
+    if (tokens.length === 0) {
+        tokens.push({
+            type: 'unquoted',
+            text: text
+        });
+    }
+
+    // Step 2: Process each token
+    const processedTokens = tokens.map(token => {
+        if (token.type === 'quoted') {
+            // Keep quoted text as is
+            return token.text;
+        }
+
+        // For unquoted text, remove single asterisks but keep double asterisks
+        let cleaned = token.text;
+
+        // Temporarily replace ** with a placeholder
+        const placeholder = '\u0000DOUBLEASTERISK\u0000';
+        cleaned = cleaned.replace(/\*\*/g, placeholder);
+
+        // Remove all remaining single asterisks
+        cleaned = cleaned.replace(/\*/g, '');
+
+        // Restore double asterisks
+        cleaned = cleaned.replace(new RegExp(placeholder, 'g'), '**');
+
+        // Wrap the entire cleaned segment with asterisks if it has content
+        const trimmed = cleaned.trim();
+        if (trimmed.length > 0) {
+            const leadingSpace = cleaned.match(/^\s*/)[0];
+            const trailingSpace = cleaned.match(/\s*$/)[0];
+            return leadingSpace + '*' + trimmed + '*' + trailingSpace;
+        }
+
+        return cleaned;
+    });
+
+    return processedTokens.join('');
 }
 
 async function addAsterisksToMessage(messageIndex) {
