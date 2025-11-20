@@ -8,50 +8,73 @@ function wrapWithAsterisks(text) {
         return text;
     }
 
-    // Split text into sentences (basic sentence splitting)
-    const sentences = text.split(/([.!?]+\s+)/);
-    
-    const processedSentences = sentences.map(segment => {
-        // Skip empty segments or whitespace-only segments
-        if (!segment.trim()) {
-            return segment;
+    let result = '';
+    let i = 0;
+    let buffer = '';
+
+    while (i < text.length) {
+        const char = text[i];
+
+        // Check for quoted text
+        if (char === '"') {
+            // Flush buffer with asterisks if it has content
+            if (buffer.trim()) {
+                result += '*' + buffer + '*';
+                buffer = '';
+            }
+
+            // Find closing quote
+            let quoteContent = '"';
+            i++;
+            while (i < text.length && text[i] !== '"') {
+                quoteContent += text[i];
+                i++;
+            }
+            if (i < text.length) {
+                quoteContent += '"';
+                i++;
+            }
+            result += quoteContent;
+            continue;
         }
 
-        // Skip punctuation segments
-        if (/^[.!?]+\s*$/.test(segment)) {
-            return segment;
+        // Check for asterisk-wrapped text
+        if (char === '*') {
+            // Flush buffer with asterisks if it has content
+            if (buffer.trim()) {
+                result += '*' + buffer + '*';
+                buffer = '';
+            }
+
+            // Find closing asterisk
+            let asteriskContent = '*';
+            i++;
+            while (i < text.length && text[i] !== '*') {
+                asteriskContent += text[i];
+                i++;
+            }
+            if (i < text.length) {
+                asteriskContent += '*';
+                i++;
+            }
+            result += asteriskContent;
+            continue;
         }
 
-        const trimmed = segment.trim();
-        
-        // Check if already surrounded by asterisks or quotes
-        const startsWithMarker = /^[\*"]/.test(trimmed);
-        const endsWithMarker = /[\*"]$/.test(trimmed);
-        
-        // If already surrounded by markers, return as is
-        if (startsWithMarker && endsWithMarker) {
-            return segment;
-        }
-        
-        // If partially marked, return as is to avoid breaking formatting
-        if (startsWithMarker || endsWithMarker) {
-            return segment;
-        }
-        
-        // Check if the sentence contains asterisks or quotes internally
-        // If so, it might be intentionally formatted, so skip it
-        if (/[\*"]/.test(trimmed)) {
-            return segment;
-        }
-        
-        // Wrap with asterisks, preserving leading/trailing whitespace
-        const leadingSpace = segment.match(/^\s*/)[0];
-        const trailingSpace = segment.match(/\s*$/)[0];
-        
-        return leadingSpace + '*' + trimmed + '*' + trailingSpace;
-    });
+        // Regular character - add to buffer
+        buffer += char;
+        i++;
+    }
 
-    return processedSentences.join('');
+    // Flush remaining buffer
+    if (buffer.trim()) {
+        result += '*' + buffer + '*';
+    } else if (buffer) {
+        // Preserve trailing whitespace
+        result += buffer;
+    }
+
+    return result;
 }
 
 async function addAsterisksToMessage(messageIndex) {
@@ -144,7 +167,7 @@ jQuery(async () => {
     try {
         // Inject buttons into existing messages
         setTimeout(injectAsteriskButtons, 100);
-        
+
         // Watch for new messages
         observeForNewMessages();
 
@@ -154,7 +177,7 @@ jQuery(async () => {
         });
 
         // Handle button clicks
-        $(document).on('click', '.asterisk_wrap_button', async function(e) {
+        $(document).on('click', '.asterisk_wrap_button', async function (e) {
             const $icon = $(e.currentTarget);
             const $mes = $icon.closest('.mes');
             const messageId = parseInt($mes.attr('mesid'));
