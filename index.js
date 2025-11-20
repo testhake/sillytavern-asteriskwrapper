@@ -79,16 +79,36 @@ function wrapWithAsterisks(text) {
             }
         }
 
-        // Process chunks and wrap plain text with asterisks
-        const result = chunks.map(chunk => {
+        // Process chunks and wrap plain text with asterisks (if not already wrapped)
+        const result = chunks.map((chunk, index) => {
             if (chunk.type === 'plain') {
                 const trimmed = chunk.text.trim();
                 if (!trimmed) {
                     return chunk.text; // Keep whitespace as is
                 }
+
+                // Check if this plain text is already surrounded by asterisks from adjacent chunks
+                const prevChunk = index > 0 ? chunks[index - 1] : null;
+                const nextChunk = index < chunks.length - 1 ? chunks[index + 1] : null;
+
+                // Check if preceded by an asterisked chunk that ends with *
+                const hasAsteriskBefore = prevChunk && prevChunk.type === 'asterisked' && prevChunk.text.endsWith('*');
+                // Check if followed by an asterisked chunk that starts with *
+                const hasAsteriskAfter = nextChunk && nextChunk.type === 'asterisked' && nextChunk.text.startsWith('*');
+
+                // If already surrounded by asterisks, don't add more
+                if (hasAsteriskBefore && hasAsteriskAfter) {
+                    return chunk.text;
+                }
+
                 const leadingSpace = chunk.text.match(/^\s*/)[0];
                 const trailingSpace = chunk.text.match(/\s*$/)[0];
-                return leadingSpace + '*' + trimmed + '*' + trailingSpace;
+
+                // Add asterisks only where needed
+                const prefix = hasAsteriskBefore ? '' : '*';
+                const suffix = hasAsteriskAfter ? '' : '*';
+
+                return leadingSpace + prefix + trimmed + suffix + trailingSpace;
             }
             return chunk.text;
         }).join('');
