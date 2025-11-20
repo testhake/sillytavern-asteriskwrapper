@@ -64,18 +64,14 @@ function wrapWithAsterisks(text) {
             return token.text;
         }
 
-        // For unquoted text, remove single asterisks but keep double asterisks
+        // For unquoted text, remove ALL asterisks and underscores (single or double)
         let cleaned = token.text;
 
-        // Temporarily replace ** with a placeholder
-        const placeholder = '\u0000DOUBLEASTERISK\u0000';
-        cleaned = cleaned.replace(/\*\*/g, placeholder);
+        // Remove all asterisks (single and double)
+        cleaned = cleaned.replace(/\*+/g, '');
 
-        // Remove all remaining single asterisks
-        cleaned = cleaned.replace(/\*/g, '');
-
-        // Restore double asterisks
-        cleaned = cleaned.replace(new RegExp(placeholder, 'g'), '**');
+        // Remove all underscores (single and double) 
+        cleaned = cleaned.replace(/_+/g, '');
 
         // Wrap the entire cleaned segment with asterisks if it has content
         const trimmed = cleaned.trim();
