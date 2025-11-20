@@ -8,83 +8,95 @@ function wrapWithAsterisks(text) {
         return text;
     }
 
-    // Step 1: Parse the text into tokens (quoted text and non-quoted text)
-    const tokens = [];
-    let currentPos = 0;
-    const quoteRegex = /"[^"]*"/g;
-    let match;
+    // Split text into paragraphs (separated by line breaks)
+    const paragraphs = text.split(/(\n+)/);
 
-    // Extract all quoted sections
-    const quotes = [];
-    while ((match = quoteRegex.exec(text)) !== null) {
-        quotes.push({
-            start: match.index,
-            end: match.index + match[0].length,
-            text: match[0]
-        });
-    }
-
-    // Build tokens array with quoted and unquoted sections
-    quotes.forEach(quote => {
-        // Add text before quote
-        if (currentPos < quote.start) {
-            tokens.push({
-                type: 'unquoted',
-                text: text.substring(currentPos, quote.start)
-            });
+    const processedParagraphs = paragraphs.map(paragraph => {
+        // If it's just newlines, keep them as is
+        if (/^\n+$/.test(paragraph)) {
+            return paragraph;
         }
-        // Add quoted text
-        tokens.push({
-            type: 'quoted',
-            text: quote.text
-        });
-        currentPos = quote.end;
+
+        // Skip empty or whitespace-only paragraphs
+        if (!paragraph.trim()) {
+            return paragraph;
+        }
+
+        // Split paragraph into chunks by quoted text and already asterisked text
+        const chunks = [];
+        let currentPos = 0;
+        let inQuotes = false;
+        let inAsterisks = false;
+        let chunkStart = 0;
+
+        for (let i = 0; i < paragraph.length; i++) {
+            const char = paragraph[i];
+
+            // Handle quotes
+            if (char === '"') {
+                // Save any plain text before the quote
+                if (i > chunkStart && !inQuotes && !inAsterisks) {
+                    chunks.push({ text: paragraph.substring(chunkStart, i), type: 'plain' });
+                }
+
+                // Find the closing quote
+                if (!inQuotes) {
+                    inQuotes = true;
+                    chunkStart = i;
+                } else {
+                    // Closing quote found
+                    chunks.push({ text: paragraph.substring(chunkStart, i + 1), type: 'quoted' });
+                    inQuotes = false;
+                    chunkStart = i + 1;
+                }
+            }
+            // Handle asterisks
+            else if (char === '*' && !inQuotes) {
+                // Save any plain text before the asterisk
+                if (i > chunkStart && !inAsterisks) {
+                    chunks.push({ text: paragraph.substring(chunkStart, i), type: 'plain' });
+                }
+
+                if (!inAsterisks) {
+                    inAsterisks = true;
+                    chunkStart = i;
+                } else {
+                    // Closing asterisk found
+                    chunks.push({ text: paragraph.substring(chunkStart, i + 1), type: 'asterisked' });
+                    inAsterisks = false;
+                    chunkStart = i + 1;
+                }
+            }
+        }
+
+        // Add any remaining text
+        if (chunkStart < paragraph.length) {
+            const remaining = paragraph.substring(chunkStart);
+            if (remaining.trim()) {
+                chunks.push({ text: remaining, type: inQuotes || inAsterisks ? (inQuotes ? 'quoted' : 'asterisked') : 'plain' });
+            } else {
+                chunks.push({ text: remaining, type: 'whitespace' });
+            }
+        }
+
+        // Process chunks and wrap plain text with asterisks
+        const result = chunks.map(chunk => {
+            if (chunk.type === 'plain') {
+                const trimmed = chunk.text.trim();
+                if (!trimmed) {
+                    return chunk.text; // Keep whitespace as is
+                }
+                const leadingSpace = chunk.text.match(/^\s*/)[0];
+                const trailingSpace = chunk.text.match(/\s*$/)[0];
+                return leadingSpace + '*' + trimmed + '*' + trailingSpace;
+            }
+            return chunk.text;
+        }).join('');
+
+        return result;
     });
 
-    // Add remaining text after last quote
-    if (currentPos < text.length) {
-        tokens.push({
-            type: 'unquoted',
-            text: text.substring(currentPos)
-        });
-    }
-
-    // If no quotes found, entire text is unquoted
-    if (tokens.length === 0) {
-        tokens.push({
-            type: 'unquoted',
-            text: text
-        });
-    }
-
-    // Step 2: Process each token
-    const processedTokens = tokens.map(token => {
-        if (token.type === 'quoted') {
-            // Keep quoted text as is
-            return token.text;
-        }
-
-        // For unquoted text, remove ALL asterisks and underscores (single or double)
-        let cleaned = token.text;
-
-        // Remove all asterisks (single and double)
-        cleaned = cleaned.replace(/\*+/g, '');
-
-        // Remove all underscores (single and double) 
-        cleaned = cleaned.replace(/_+/g, '');
-
-        // Wrap the entire cleaned segment with asterisks if it has content
-        const trimmed = cleaned.trim();
-        if (trimmed.length > 0) {
-            const leadingSpace = cleaned.match(/^\s*/)[0];
-            const trailingSpace = cleaned.match(/\s*$/)[0];
-            return leadingSpace + '*' + trimmed + '*' + trailingSpace;
-        }
-
-        return cleaned;
-    });
-
-    return processedTokens.join('');
+    return processedParagraphs.join('');
 }
 
 async function addAsterisksToMessage(messageIndex) {
